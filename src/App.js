@@ -50,18 +50,19 @@ function FileUpload() {
 
 
   return () => {
-      if (ffmpeg.current) {
-        ffmpeg.off('progress');
-        ffmpeg.off('log');
+       
 
-        if (ffmpeg.FS && ffmpeg.FS('readdir', '/').includes('input.webm')) {
-              ffmpeg.FS('unlink', 'input.webm');
-          }
-          if (ffmpeg.FS && ffmpeg.FS('readdir', '/').includes('output.mp4')) {
-              ffmpeg.FS('unlink', 'output.mp4');
-          }
+        ffmpegRef.current.off('progress');
 
-      }
+        if (ffmpegRef.current.FS && ffmpeg.current.FS('readdir', '/').includes('input.webm')) {
+              ffmpegRef.current.FS('unlink', 'input.webm');
+          }
+        if (ffmpegRef.current.FS && ffmpeg.current.FS('readdir', '/').includes('output.mp4')) {
+            ffmpegRef.current.FS('unlink', 'output.mp4');
+        }
+      
+        ffmpegRef.current = null;
+
   };
 
 
