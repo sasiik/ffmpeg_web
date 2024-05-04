@@ -15,53 +15,64 @@ function FileUpload() {
   const videoRef = useRef(null);
   const messageRef = useRef(null);
 
-  // window.onbeforeunload = function() {
-  //   if (ffmpegRef.current) {
-  //     ffmpegRef.current = null; // Properly unload FFmpeg to free up resources
-  //   }
-  //   // Perform cleanup tasks here
-  //   // e.g., revoke blob URLs, terminate workers, close database connections
-  // //   return null;  // Returning null prevents the browser from displaying a confirmation dialog
-  // // };
-  // window.onbeforeunload = function() {
-  //   localStorage.clear();
-  //   sessionStorage.clear();
-  //   return null;  // Optionally return a string to prompt the user with a confirmation dialog
-  // };
-
   useEffect(() => {
+
+    let ffmpeg;
+
     const loadFFmpeg = async () => {
-        const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd';
-        ffmpegRef.current = new FFmpeg();
-        const ffmpeg = ffmpegRef.current
+      const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd';
+      
 
-        ffmpeg.on('progress', ({ progress, time }) => {
+      ffmpeg.on('progress', ({ progress, time }) => {
           messageRef.current.innerHTML = `${progress * 100} % (transcoded time: ${time / 1000000} s)`;
-        });
+      });
 
-        ffmpeg.on('log', ({ message }) => {
+      ffmpeg.on('log', ({ message }) => {
           messageRef.current.innerHTML = message;
           console.log(message);
-        });
+      });
 
-        try {
-            // Generate blob URLs
-            // Load FFmpeg with the generated URLs
-              await ffmpeg.load({
-                  coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                  wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                  workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
-              });
+      try {
+          await ffmpeg.load({
+              coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+              wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+              workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
+          });
 
-              setLoaded(true);
-            // Use FFmpeg for whatever needed here
-        } catch (error) {
-            console.error('Error loading FFmpeg:', error);
-        }
-    };
+          setLoaded(true);
+      } catch (error) {
+          console.error('Error loading FFmpeg:', error);
+      }
+  };
 
-    loadFFmpeg();
+    
+    if (!ffmpegRef.current) {
+      ffmpegRef.current = new FFmpeg();
+      ffmpeg = ffmpegRef.current;
+      loadFFmpeg();
+    }
+    
+
+
+  return () => {
+      if (ffmpeg.current) {
+        ffmpeg.off('progress');
+        ffmpeg.off('log');
+
+        if (ffmpeg.FS && ffmpeg.FS('readdir', '/').includes('input.webm')) {
+              ffmpeg.FS('unlink', 'input.webm');
+          }
+          if (ffmpeg.FS && ffmpeg.FS('readdir', '/').includes('output.mp4')) {
+              ffmpeg.FS('unlink', 'output.mp4');
+          }
+
+      }
+  };
+
+
+   
 }, []);
+
 
   
 
