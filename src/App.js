@@ -11,7 +11,7 @@ function FileUpload() {
   const [sliderValue, setSliderValue] = useState(DEFAULT_FPS);
    // State to handle the slider value
   const [loaded, setLoaded] = useState(false);
-  const ffmpegRef = useRef(new FFmpeg());
+  const ffmpegRef = useRef(null);
   const videoRef = useRef(null);
   const messageRef = useRef(null);
 
@@ -32,6 +32,7 @@ function FileUpload() {
   useEffect(() => {
     const loadFFmpeg = async () => {
         const baseURL = 'https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd';
+        ffmpegRef.current = new FFmpeg();
         const ffmpeg = ffmpegRef.current
 
         ffmpeg.on('progress', ({ progress, time }) => {
@@ -75,6 +76,7 @@ function FileUpload() {
         }
         else {
           alert('Video file should be in WEBM format');
+          event.target.value = null;
         }
         
       } else {
@@ -128,10 +130,10 @@ function FileUpload() {
       console.log("Interpolation not selected, ignoring FPS.");
     }
     await ffmpeg.writeFile('input.webm', await fetchFile(file));
-    await ffmpeg.exec(['-i', 'input.webm', 'output.webm']);
-    const data = await ffmpeg.readFile('output.webm');
+    await ffmpeg.exec(['-i', 'input.webm', '-vf', video_filter, '-an', 'output.mp4']);
+    const data = await ffmpeg.readFile('output.mp4');
     videoRef.current.src =
-        URL.createObjectURL(new Blob([data.buffer], {type: 'video/webm'}));
+        URL.createObjectURL(new Blob([data.buffer], {type: 'video/mp4'}));
     }
 
   return (
