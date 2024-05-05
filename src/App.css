@@ -37,35 +37,35 @@
   }
 }
 
-.overlay {
+/* .overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background-color: rgba(255, 255, 255, 0.5); /* Semi-transparent white */
-  z-index: 9999; /* Ensure it's above all other elements */
+  /* z-index: 9999; 
   display: flex;
   justify-content: center;
-  align-items: center; /* Add blur effect to the background */
-}
+  align-items: center;
+} */
 
-.loader {
-  border: 8px solid #f3f3f3; /* Light grey */
-  border-top: 8px solid #3498db; /* Blue */
+/* .loader {
+  border: 8px solid #f3f3f3; 
+  border-top: 8px solid #3498db; 
   border-radius: 50%;
   width: 50px;
   height: 50px;
   animation: spin 2s linear infinite;
-  position: absolute; /* Ensure wheel stays on top */
-}
+  position: absolute; 
+} */
 
-@keyframes spin {
+/* @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
-}
+} */
 
-.overlay-content {
-  position: relative; /* Set relative positioning for centered content */
-  z-index: 1; /* Ensure content is above the blur */
-}
+/* .overlay-content {
+  position: relative; 
+  z-index: 1; 
+}  */
