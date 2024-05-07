@@ -15,17 +15,30 @@ function FileUpload() {
   const [videoURL, setVideoURL] = useState("");
   const messageRef = useRef(null);
 
-  const load = async () => {
-    const baseURL = "https://unpkg.com/@ffmpeg/core-mt@0.12.6/dist/umd";
+  const load = async ({ logging = false } = {}) => {
+    const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
     const ffmpeg = ffmpegRef.current;
 
     try {
-      ffmpeg.on("progress", ({ progress, time }) => {
-        messageRef.current.innerHTML = `${progress * 100} % (transcoded time: ${
-          time / 1000000
-        } s)`;
-      });
+      // Attach appropriate event handlers based on logging flag
+      if (logging) {
+        ffmpeg.on("log", ({ message }) => {
+          if (messageRef.current) {
+            messageRef.current.innerHTML = message;
+          }
+          console.log(message);
+        });
+      } else {
+        ffmpeg.on("progress", ({ progress, time }) => {
+          if (messageRef.current) {
+            messageRef.current.innerHTML = `${
+              progress * 100
+            } % (transcoded time: ${time / 1000000} s)`;
+          }
+        });
+      }
 
+      // Load FFmpeg with the given URLs
       await ffmpeg.load({
         coreURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.js`,
@@ -34,10 +47,6 @@ function FileUpload() {
         wasmURL: await toBlobURL(
           `${baseURL}/ffmpeg-core.wasm`,
           "application/wasm"
-        ),
-        workerURL: await toBlobURL(
-          `${baseURL}/ffmpeg-core.worker.js`,
-          "text/javascript"
         ),
       });
 
@@ -85,7 +94,7 @@ function FileUpload() {
     try {
       setSubmitted(true);
       if (!ffmpegRef.current.loaded) {
-        await load();
+        await load({ logging: true });
       }
 
       const uploadData = {
