@@ -55,10 +55,10 @@ function FileUpload() {
     const selectedFile = event.target.files[0];
     if (selectedFile) {
       if (selectedFile.type.startsWith("video/")) {
-        if (selectedFile.name.endsWith(".webm")) {
+        if (selectedFile.name.endsWith(".mp4")) {
           setFile(selectedFile);
         } else {
-          alert("Video file should be in WEBM format");
+          alert("Video file should be in MP4 format");
           event.target.value = null;
         }
       } else {
@@ -107,8 +107,8 @@ function FileUpload() {
   const cleanupFiles = () => {
     try {
       const ffmpeg = ffmpegRef.current;
-      if (ffmpeg.FS && ffmpeg.FS("readdir", "/").includes("input.webm")) {
-        ffmpeg.FS("unlink", "input.webm");
+      if (ffmpeg.FS && ffmpeg.FS("readdir", "/").includes("input.mp4")) {
+        ffmpeg.FS("unlink", "input.mp4");
       }
       if (ffmpeg.FS && ffmpeg.FS("readdir", "/").includes("output.mp4")) {
         ffmpeg.FS("unlink", "output.mp4");
@@ -133,10 +133,10 @@ function FileUpload() {
         console.log("Interpolation not selected, ignoring FPS.");
       }
 
-      await ffmpeg.writeFile("input.webm", await fetchFile(file));
+      await ffmpeg.writeFile("input.mp4", await fetchFile(file));
       await ffmpeg.exec([
         "-i",
-        "input.webm",
+        "input.mp4",
         "-vf",
         video_filter,
         "-an",
