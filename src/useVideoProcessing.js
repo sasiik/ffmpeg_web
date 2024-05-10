@@ -1,9 +1,22 @@
+import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
+import { useRef, useState } from "react";
 
 export const useVideoProcessing = () => {
-  const loadFFmpeg = async ({ logging = false } = {}, ffmpeg, messageRef) => {
+  const DEFAULT_FPS = 30;
+  const [file, setFile] = useState(null);
+  const [interpolate, setInterpolate] = useState(false);
+  const [sliderValue, setSliderValue] = useState(DEFAULT_FPS);
+  const [loaded, setLoaded] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [videoURL, setVideoURL] = useState("");
+  const ffmpegRef = useRef(new FFmpeg());
+  const messageRef = useRef(null);
+  const logsRef = useRef([]);
+
+  const loadFFmpeg = async ({ logging = false } = {}) => {
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-    var isLoaded = false;
+    const ffmpeg = ffmpegRef.current;
 
     try {
       if (logging) {
@@ -11,7 +24,10 @@ export const useVideoProcessing = () => {
           if (messageRef.current) {
             messageRef.current.innerHTML = message;
           }
-          console.log(message);
+          if (message.includes("mpdecimate")) {
+            logsRef.current.push(message);
+            console.log(message);
+          }
         });
       } else {
         ffmpeg.on("progress", ({ progress, time }) => {
@@ -34,7 +50,7 @@ export const useVideoProcessing = () => {
         ),
       });
 
-      isLoaded = true;
+      setLoaded(true);
     } catch (error) {
       console.error("Error loading FFmpeg:", error);
       if (messageRef.current) {
@@ -42,41 +58,119 @@ export const useVideoProcessing = () => {
           "Failed to load FFmpeg. Please check the console for more details.";
       }
     }
-    return isLoaded;
   };
 
-  const transcode = async ({ file, interpolate, fps }, ffmpeg, videoRef) => {
-    let video_filter;
-    if (videoRef) {
-      videoRef = "";
+  const transcode = async ({ file }) => {
+    if (!file) {
+      console.error("No file provided for transcoding.");
+      return;
     }
+    setVideoURL("");
+    const ffmpeg = ffmpegRef.current;
 
-    if (interpolate && fps !== null) {
-      video_filter = `mpdecimate,setpts=N/FRAME_RATE/TB,minterpolate='mi_mode=mci:mc_mode=aobmc:vsbmc=1:fps=${fps}`;
-    } else {
-      video_filter = `mpdecimate,setpts=N/FRAME_RATE/TB`;
-      console.log("Interpolation not selected, ignoring FPS.");
-    }
+    const video_filter = `fps=1,format=gray,lutyuv='y=if(gt(val,128), 1,0)',scale=320:-1,mpdecimate=hi=64:lo=30:frac=0.33,setpts=N/FRAME_RATE/TB,fps=1`;
 
-    await ffmpeg.writeFile("input.mp4", await fetchFile(file));
-    await ffmpeg.exec([
-      "-i",
-      "input.mp4",
-      "-vf",
-      video_filter,
-      "-an",
-      "output.mp4",
-    ]);
-    const data = await ffmpeg.readFile("output.mp4");
-    const url = URL.createObjectURL(
-      new Blob([data.buffer], { type: "video/mp4" })
-    );
-
-    videoRef.current.src = url;
-  };
-
-  const cleanupFiles = (ffmpeg) => {
     try {
+      // const logs = [];
+      // ffmpeg.setLogger(({ type, message }) => {
+      //   if (type === "fferr") {
+      //     console.log(message);
+      //     logs.push(message);
+      //   }
+      // });
+
+      await ffmpeg.writeFile("input.mp4", await fetchFile(file));
+      await ffmpeg.exec([
+        "-i",
+        "input.mp4",
+        "-vf",
+        video_filter,
+        "-an",
+        "output.mp4",
+        "-loglevel",
+        "debug",
+      ]);
+
+      processLogs(logsRef.current);
+
+      // const data = await ffmpeg.readFile("output.mp4");
+
+      // const url = URL.createObjectURL(
+      //   new Blob([data.buffer], { type: "video/mp4" })
+      // );
+      // setVideoURL(url);
+
+      // console.log(ffmpeg.FS("readFile", "ffmpeg.log").toString());
+    } catch (error) {
+      console.error("Error during the transcoding process:", error);
+      alert("Failed to process video due to an error.");
+    }
+  };
+
+  const processLogs = () => {
+    const logs = logsRef.current;
+    let raw_logs = [];
+    const regex = /(keep|drop)\spts:.*\spts_time:(\d+)/;
+    logs.forEach((log) => {
+      const match = log.match(regex);
+      if (match) {
+        raw_logs.push(`${match[1]} pts_time:${match[2]}`);
+      }
+    });
+    let lastType = "";
+    let processed_logs = [];
+    raw_logs.forEach((raw_log) => {
+      const currentType = raw_log.split(" ")[0];
+
+      if (currentType !== lastType) {
+        processed_logs.push(raw_log);
+        console.log(raw_log);
+        lastType = currentType;
+      }
+    });
+
+    calculateDroppedPeriods(processed_logs, {
+      durationThreshold: 3,
+    });
+  };
+
+  const calculateDroppedPeriods = (lines, { durationThreshold = 5 } = {}) => {
+    // Prepare to collect results and track total dropped time
+    let results = [];
+    let totalDropped = 0;
+
+    // Process each pair of adjacent lines
+    for (let i = 0; i < lines.length - 1; i++) {
+      const current = lines[i];
+      const next = lines[i + 1];
+
+      const currentParts = current.split(" pts_time:");
+      const nextParts = next.split(" pts_time:");
+
+      const currentType = currentParts[0];
+      const nextType = nextParts[0];
+
+      // Check if a 'drop' entry is followed by a 'keep' entry
+      if (currentType === "drop" && nextType === "keep") {
+        const currentTime = parseInt(currentParts[1], 10);
+        const nextTime = parseInt(nextParts[1], 10);
+
+        const duration = nextTime - currentTime;
+        totalDropped += duration;
+
+        if (duration > durationThreshold) {
+          const result = `drop, start: ${currentTime}, end: ${nextTime}`;
+          results.push(result);
+          console.log(result);
+        }
+      }
+    }
+    console.log(`Total frames dropped: ${totalDropped}`);
+  };
+
+  const cleanupFiles = () => {
+    try {
+      const ffmpeg = ffmpegRef.current;
       if (ffmpeg.FS && ffmpeg.FS("readdir", "/").includes("input.mp4")) {
         ffmpeg.FS("unlink", "input.mp4");
       }
@@ -89,8 +183,21 @@ export const useVideoProcessing = () => {
   };
 
   return {
+    file,
+    setFile,
+    interpolate,
+    setInterpolate,
+    sliderValue,
+    setSliderValue,
+    loaded,
+    setLoaded,
+    submitted,
+    setSubmitted,
+    videoURL,
+    setVideoURL,
     loadFFmpeg,
     transcode,
     cleanupFiles,
+    messageRef,
   };
 };

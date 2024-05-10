@@ -1,37 +1,36 @@
-import { FFmpeg } from "@ffmpeg/ffmpeg";
-import React, { useRef, useState } from "react";
+import React from "react";
 import { useVideoProcessing } from "./useVideoProcessing";
 
-function FileUpload() {
-  const DEFAULT_FPS = 30;
-  const [file, setFile] = useState(null);
-  const [interpolate, setInterpolate] = useState(false);
-  const [sliderValue, setSliderValue] = useState(DEFAULT_FPS);
-  const [submitted, setSubmitted] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const messageRef = useRef(null);
-  const videoRef = useRef(null);
-
-  const { loadFFmpeg, transcode, cleanupFiles } = useVideoProcessing();
-
-  const ffmpegRef = useRef(new FFmpeg());
+function MainApp() {
+  const {
+    file,
+    setFile,
+    interpolate,
+    setInterpolate,
+    sliderValue,
+    setSliderValue,
+    loaded,
+    submitted,
+    setSubmitted,
+    videoURL,
+    loadFFmpeg,
+    transcode,
+    cleanupFiles,
+    messageRef,
+  } = useVideoProcessing();
 
   const handleFileChange = (event) => {
     const selectedFile = event.target.files[0];
     if (
       selectedFile &&
       selectedFile.type.startsWith("video/") &&
-      selectedFile.name.endsWith(".mp4")
+      selectedFile.name.toLowerCase().endsWith(".mp4")
     ) {
       setFile(selectedFile);
     } else {
       alert("Please upload a video file in MP4 format");
       event.target.value = null;
     }
-  };
-
-  const handleCheckboxChange = (event) => {
-    setInterpolate(event.target.checked);
   };
 
   const handleSliderChange = (event) => {
@@ -45,21 +44,16 @@ function FileUpload() {
     }
     setSubmitted(true);
     if (!loaded) {
-      const isLoaded = await loadFFmpeg(
-        { logging: true },
-        ffmpegRef.current,
-        messageRef
-      );
-      setLoaded(isLoaded);
+      await loadFFmpeg({ logging: true });
     }
     const uploadData = {
       file,
       interpolate,
       fps: interpolate ? sliderValue : null,
     };
-    await transcode(uploadData, ffmpegRef.current, videoRef);
+    await transcode(uploadData);
     setSubmitted(false);
-    cleanupFiles(ffmpegRef.current);
+    cleanupFiles();
   };
 
   return (
@@ -77,7 +71,7 @@ function FileUpload() {
           type="checkbox"
           id="interpolateCheckbox"
           checked={interpolate}
-          onChange={handleCheckboxChange}
+          onChange={() => setInterpolate(!interpolate)}
         />
         <label className="form-check-label" htmlFor="interpolateCheckbox">
           Interpolate
@@ -112,9 +106,9 @@ function FileUpload() {
           <p>Loading FFmpeg, please wait...</p>
         </div>
       )}
-      {loaded && videoRef && (
+      {loaded && videoURL && (
         <a
-          href={videoRef}
+          href={videoURL}
           download="output.mp4"
           className="btn btn-success mt-4 col-4 d-block mx-auto"
         >
@@ -126,4 +120,4 @@ function FileUpload() {
   );
 }
 
-export default FileUpload;
+export default MainApp;
