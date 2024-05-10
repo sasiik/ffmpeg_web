@@ -13,6 +13,7 @@ export const useVideoProcessing = () => {
   const ffmpegRef = useRef(new FFmpeg());
   const messageRef = useRef(null);
   const logsRef = useRef([]);
+  const droppedFramesRef = useRef([]);
 
   const loadFFmpeg = async ({ logging = false } = {}) => {
     const baseURL = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
@@ -60,7 +61,7 @@ export const useVideoProcessing = () => {
     }
   };
 
-  const transcode = async ({ file }) => {
+  const defineSilenceFrames = async ({ file }) => {
     if (!file) {
       console.error("No file provided for transcoding.");
       return;
@@ -117,6 +118,7 @@ export const useVideoProcessing = () => {
         raw_logs.push(`${match[1]} pts_time:${match[2]}`);
       }
     });
+    raw_logs.push(`keep pts_time:${raw_logs.length}`);
     let lastType = "";
     let processed_logs = [];
     raw_logs.forEach((raw_log) => {
@@ -148,10 +150,9 @@ export const useVideoProcessing = () => {
       const nextParts = next.split(" pts_time:");
 
       const currentType = currentParts[0];
-      const nextType = nextParts[0];
 
       // Check if a 'drop' entry is followed by a 'keep' entry
-      if (currentType === "drop" && nextType === "keep") {
+      if (currentType === "drop") {
         const currentTime = parseInt(currentParts[1], 10);
         const nextTime = parseInt(nextParts[1], 10);
 
@@ -159,13 +160,49 @@ export const useVideoProcessing = () => {
         totalDropped += duration;
 
         if (duration > durationThreshold) {
-          const result = `drop, start: ${currentTime}, end: ${nextTime}`;
-          results.push(result);
-          console.log(result);
+          results.push([currentTime, nextTime]);
+          console.log(`drop, start: ${currentTime}, end: ${nextTime}`);
         }
       }
     }
+    droppedFramesRef.current = results;
     console.log(`Total frames dropped: ${totalDropped}`);
+  };
+
+  const dropFrames = async ({ file }) => {
+    // Prepare the input file
+    const dropRanges = droppedFramesRef.current;
+    console.log(dropRanges);
+    const ffmpeg = ffmpegRef.current;
+
+    try {
+      ffmpeg.writeFile("input.mp4", await fetchFile(file));
+
+      // Construct the filter to keep frames outside the drop ranges
+      const keepFilter = dropRanges
+        .map((range) => `not(between(t,${range[0]},${range[1]}))`)
+        .join("*");
+      console.log(keepFilter);
+
+      // Command to apply filters and output the processed video
+      await ffmpeg.exec([
+        "-i",
+        "input.mp4",
+        "-vf",
+        `select='${keepFilter}',setpts=N/FRAME_RATE/TB`,
+        "-an",
+        "output.mp4",
+      ]);
+      const videoData = await ffmpeg.readFile("output.mp4");
+      setVideoURL(
+        URL.createObjectURL(new Blob([videoData.buffer], { type: "video/mp4" }))
+      );
+    } catch (error) {
+      console.error("Error during the frame dropping process:", error);
+      alert(
+        "An error occurred while processing your video. Please check the console for more details."
+      );
+    }
   };
 
   const cleanupFiles = () => {
@@ -196,8 +233,9 @@ export const useVideoProcessing = () => {
     videoURL,
     setVideoURL,
     loadFFmpeg,
-    transcode,
+    defineSilenceFrames,
     cleanupFiles,
     messageRef,
+    dropFrames,
   };
 };

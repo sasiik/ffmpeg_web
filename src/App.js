@@ -14,9 +14,10 @@ function MainApp() {
     setSubmitted,
     videoURL,
     loadFFmpeg,
-    transcode,
+    defineSilenceFrames,
     cleanupFiles,
     messageRef,
+    dropFrames,
   } = useVideoProcessing();
 
   const handleFileChange = (event) => {
@@ -51,7 +52,8 @@ function MainApp() {
       interpolate,
       fps: interpolate ? sliderValue : null,
     };
-    await transcode(uploadData);
+    await defineSilenceFrames(uploadData);
+    await dropFrames(uploadData);
     setSubmitted(false);
     cleanupFiles();
   };
